@@ -1,6 +1,6 @@
-from setuptools import find_packages, setup
-from glob import glob
 import os
+from glob import glob
+from setuptools import setup, find_packages
 
 package_name = 'move_robot'
 
@@ -23,8 +23,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'move_robot = move_robot.move_robot:main'
+            'move_robot = move_robot.move_robot:main',
+            'spawn_entities = move_robot.spawn_entities:main',
         ],
     },
 )
-

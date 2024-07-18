@@ -1,0 +1,39 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="marker">
+    <static>false</static>
+    <link name="marker_link">
+      <visual name="marker_visual">
+        <geometry>
+          <mesh>
+            <uri>file:///home/bigchungus/ros2_iron_ws/src/move_robot/models/marker.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>1 1 1 1</ambient>
+          <diffuse>1 1 1 1</diffuse>
+        </material>
+      </visual>
+      <collision name="marker_collision">
+        <geometry>
+          <mesh>
+            <uri>file:///home/bigchungus/ros2_iron_ws/src/move_robot/models/marker.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia>
+          <ixx>0.001</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.001</iyy>
+          <iyz>0</iyz>
+          <izz>0.001</izz>
+        </inertia>
+      </inertial>
+    </link>
+  </model>
+</sdf>

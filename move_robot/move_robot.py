@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+from scipy.spatial.transform import Rotation as R
 from threading import Thread
 import math
 import time
@@ -17,24 +17,25 @@ from rclpy.qos import QoSProfile
 
 WAYPOINTS = [
     # "W"
-    [[0.35, 0.14, 0.35], [0.5, 0.5, 0.5, 0.5]],  # Start of W
-    [[0.35, 0.11, 0.25], [0.5, 0.5, 0.5, 0.5]],  # Mid bottom of W
-    [[0.35, 0.08, 0.35], [0.5, 0.5, 0.5, 0.5]],  # Mid top of W
-    [[0.35, 0.05, 0.25], [0.5, 0.5, 0.5, 0.5]],  # Mid bottom of W
-    [[0.35, 0.02, 0.35], [0.5, 0.5, 0.5, 0.5]],  # End of W
+    [[0.35, 0.14, 0.25], [0.5, 0.5, 0.5, 0.5]],  # Start of W
+    [[0.35, 0.11, 0.15], [0.5, 0.5, 0.5, 0.5]],  # Mid bottom of W
+    [[0.35, 0.08, 0.25], [0.5, 0.5, 0.5, 0.5]],  # Mid top of W
+    [[0.35, 0.05, 0.15], [0.5, 0.5, 0.5, 0.5]],  # Mid bottom of W
+    [[0.35, 0.02, 0.25], [0.5, 0.5, 0.5, 0.5]],  # End of W
 
-    [[0.3, 0.02, 0.35], [0.5, 0.5, 0.5, 0.5]],
-    [[0.3, -0.1, 0.35], [0.5, 0.5, 0.5, 0.5]],
+    [[0.3, 0.02, 0.25], [0.5, 0.5, 0.5, 0.5]],
+    [[0.3, -0.1, 0.25], [0.5, 0.5, 0.5, 0.5]],
 
     # Moving to start of "C"
-    [[0.35, -0.1, 0.35], [0.5, 0.5, 0.5, 0.5]],    # Start of C
-    [[0.35, -0.03, 0.35], [0.5, 0.5, 0.5, 0.5]],   # Top left of C
-    [[0.35, -0.03, 0.25], [0.5, 0.5, 0.5, 0.5]],   # Bottom left of C
-    [[0.35, -0.1, 0.25], [0.5, 0.5, 0.5, 0.5]],    # Bottom right of C
+    [[0.35, -0.1, 0.25], [0.5, 0.5, 0.5, 0.5]],    # Start of C
+    [[0.35, -0.03, 0.25], [0.5, 0.5, 0.5, 0.5]],   # Top left of C
+    [[0.35, -0.03, 0.15], [0.5, 0.5, 0.5, 0.5]],   # Bottom left of C
+    [[0.35, -0.1, 0.15], [0.5, 0.5, 0.5, 0.5]],    # Bottom right of C
 ]
 
 home_position = [0.0, -math.pi / 2, 0.0, -math.pi / 2, 0.0, 0.0]
 REAL_VELOCITY = 0.1
+
 
 def main():
     rclpy.init()
@@ -131,7 +132,7 @@ def main():
     )
     time.sleep(1)
     moveit2.add_collision_box(
-        id='whiteboard', position=[0.4, 0.0, 0.3], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[0.001, 0.4, 0.4]
+        id='whiteboard', position=[0.43, 0.0, 0.2], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[0.001, 0.4, 0.4]
     )
     time.sleep(1)
 
@@ -143,6 +144,8 @@ def main():
         fk_pose.pose.position.y,
         fk_pose.pose.position.z
     ]
+
+    # Original pen orientation
     pen_orientation = [
         fk_pose.pose.orientation.x,
         fk_pose.pose.orientation.y,
@@ -150,18 +153,71 @@ def main():
         fk_pose.pose.orientation.w
     ]
 
-    moveit2.add_collision_box(
-        id='pen', position=pen_position, quat_xyzw=pen_orientation, size=[0.01, 0.01, 0.09]
-    )
-    time.sleep(1)
-    moveit2.attach_collision_object(id='pen', weight=0.0)
-    time.sleep(1)
+    # Quaternion representing 90 degree rotation around z-axis
+    rotation_quaternion = R.from_euler('z', 90, degrees=True).as_quat()
+
+    # Apply the rotation to the original orientation
+    original_orientation = R.from_quat(pen_orientation)
+    rotated_orientation = R.from_quat(rotation_quaternion)
+    pen_orientation_rotated = (rotated_orientation * original_orientation).as_quat()
+
+    # moveit2.add_collision_mesh(
+    #     id='pen',
+    #     filepath="models/marker.stl",
+    #     position=pen_position,
+    #     quat_xyzw=pen_orientation_rotated,
+    #     scale=0.001
+    # )
+    # time.sleep(0.5)
+    # moveit2.attach_collision_object(id='pen', weight=0.0)
+    # time.sleep(0.5)
 
     moveit2.max_velocity = 0.3
 
-    def move_to_waypoints():
-        node.get_logger().info("Starting to move to waypoints.")
-        for idx, waypoint in enumerate(WAYPOINTS):
+    
+
+    def move_to_waypoint(waypoints_input):
+        node.get_logger().info("Moving to waypoint.")
+        waypoint_position, waypoint_orientation = waypoints_input[0]
+
+        position = Point(x=waypoint_position[0], y=waypoint_position[1], z=waypoint_position[2])
+        quat_xyzw = Quaternion(
+            x=waypoint_orientation[0],
+            y=waypoint_orientation[1],
+            z=waypoint_orientation[2],
+            w=waypoint_orientation[3]
+        )
+
+        # Compute the joint configuration for the given pose
+        joint_state = moveit2.compute_ik(position, quat_xyzw)
+        if joint_state is not None:
+            joint_config = list(joint_state.position)
+            moveit2.move_to_configuration(joint_config)
+            moveit2.wait_until_executed()
+            node.get_logger().info("Reached waypoint.")
+        else:
+            node.get_logger().warn("Failed to compute IK for the first waypoint.")
+
+    def interpolate_waypoints(waypoints, increment):
+        interpolated_points = []
+        for i in range(len(waypoints) - 1):
+            start = waypoints[i]
+            end = waypoints[i + 1]
+            distance = np.linalg.norm(np.array(end[0]) - np.array(start[0]))
+            num_interpolations = int(distance / increment)
+            for t in range(num_interpolations):
+                alpha = t / num_interpolations
+                position = [(1 - alpha) * start[0][j] + alpha * end[0][j] for j in range(3)]
+                orientation = [(1 - alpha) * start[1][j] + alpha * end[1][j] for j in range(4)]
+                interpolated_points.append([position, orientation])
+        interpolated_points.append(waypoints[-1])
+        return interpolated_points
+
+
+    def move_to_interpolated_waypoints(waypoints_input, dt):
+        interpolated_waypoints = interpolate_waypoints(waypoints_input, dt)
+        node.get_logger().info(f"Moving to interpolated waypoints with dt={dt}.")
+        for idx, waypoint in enumerate(interpolated_waypoints):
             waypoint_position, waypoint_orientation = waypoint
 
             position = Point(x=waypoint_position[0], y=waypoint_position[1], z=waypoint_position[2])
@@ -178,24 +234,16 @@ def main():
                 joint_config = list(joint_state.position)
                 moveit2.move_to_configuration(joint_config)
                 moveit2.wait_until_executed()
-                node.get_logger().info(f"Reached waypoint {idx + 1}")
+                node.get_logger().info(f"Reached interpolated waypoint {idx + 1}")
             else:
-                node.get_logger().warn(f"Failed to compute IK for waypoint {idx + 1}")
+                node.get_logger().warn(f"Failed to compute IK for interpolated waypoint {idx + 1}")
 
-            if idx > 0:
-                previous_position = WAYPOINTS[idx-1][0]
-                distance = np.linalg.norm(np.array(waypoint_position) - np.array(previous_position))
-                duration = distance / REAL_VELOCITY
-                moveit2.max_velocity = 0.3
-            else:
-                duration = 1.0
-                moveit2.max_velocity = 0.3
+            time.sleep(0.01)
 
-            time.sleep(1)
+        node.get_logger().info("Finished moving to interpolated waypoints.")
 
-        node.get_logger().info("Finished moving to waypoints.")
-
-    move_to_waypoints()
+    move_to_waypoint(WAYPOINTS)
+    move_to_interpolated_waypoints(WAYPOINTS, dt=0.005)  # Example value for dt
 
     rclpy.shutdown()
     executor_thread.join()

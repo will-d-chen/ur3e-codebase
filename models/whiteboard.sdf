@@ -1,0 +1,26 @@
+<sdf version="1.6">
+  <model name="whiteboard">
+    <static>true</static>
+    <link name="link">
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.001 0.4 0.4</size>
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <collide_without_contact_bitmask>1</collide_without_contact_bitmask>
+          </contact>
+        </surface>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>0.001 0.4 0.4</size>
+          </box>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
