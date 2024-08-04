@@ -1,0 +1,26 @@
+[0.341s] Invoking command in '/home/bigchungus/ros2_iron_ws/src/move_robot': PYTHONPATH=/home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py egg_info --egg-base build/move_robot build --build-base /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build install --record /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/install.log --single-version-externally-managed install_data
+[0.454s] running egg_info
+[0.455s] writing build/move_robot/move_robot.egg-info/PKG-INFO
+[0.455s] writing dependency_links to build/move_robot/move_robot.egg-info/dependency_links.txt
+[0.455s] writing entry points to build/move_robot/move_robot.egg-info/entry_points.txt
+[0.455s] writing requirements to build/move_robot/move_robot.egg-info/requires.txt
+[0.455s] writing top-level names to build/move_robot/move_robot.egg-info/top_level.txt
+[0.456s] reading manifest file 'build/move_robot/move_robot.egg-info/SOURCES.txt'
+[0.457s] writing manifest file 'build/move_robot/move_robot.egg-info/SOURCES.txt'
+[0.457s] running build
+[0.457s] running build_py
+[0.457s] copying move_robot/move_robot.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+[0.457s] running install
+[0.457s] running install_lib
+[0.458s] copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/move_robot.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+[0.458s] byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/move_robot.py to move_robot.cpython-310.pyc
+[0.459s] running install_data
+[0.459s] running install_egg_info
+[0.460s] removing '/home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot-0.0.0-py3.10.egg-info' (and everything under it)
+[0.460s] Copying build/move_robot/move_robot.egg-info to /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot-0.0.0-py3.10.egg-info
+[0.461s] running install_scripts
+[0.472s] Installing move_command script to /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/move_robot
+[0.472s] Installing move_robot script to /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/move_robot
+[0.472s] Installing spawn_entities script to /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/move_robot
+[0.472s] writing list of installed files to '/home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/install.log'
+[0.485s] Invoked command in '/home/bigchungus/ros2_iron_ws/src/move_robot' returned '0': PYTHONPATH=/home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py egg_info --egg-base build/move_robot build --build-base /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build install --record /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/install.log --single-version-externally-managed install_data

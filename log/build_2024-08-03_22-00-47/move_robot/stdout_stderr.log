@@ -1,0 +1,59 @@
+running egg_info
+creating build/move_robot/move_robot.egg-info
+writing build/move_robot/move_robot.egg-info/PKG-INFO
+writing dependency_links to build/move_robot/move_robot.egg-info/dependency_links.txt
+writing entry points to build/move_robot/move_robot.egg-info/entry_points.txt
+writing requirements to build/move_robot/move_robot.egg-info/requires.txt
+writing top-level names to build/move_robot/move_robot.egg-info/top_level.txt
+writing manifest file 'build/move_robot/move_robot.egg-info/SOURCES.txt'
+reading manifest file 'build/move_robot/move_robot.egg-info/SOURCES.txt'
+writing manifest file 'build/move_robot/move_robot.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build
+creating /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib
+creating /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+copying move_robot/7-24.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+copying move_robot/test.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+copying move_robot/move_command.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+copying move_robot/spawn_entities.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+copying move_robot/move_robot_moveit2.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+copying move_robot/move_robot.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+copying move_robot/__init__.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+copying move_robot/6-25.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+copying move_robot/7-30.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot
+running install
+running install_lib
+creating /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/7-24.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/test.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/move_command.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/spawn_entities.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/move_robot_moveit2.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/move_robot.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/__init__.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/6-25.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+copying /home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/build/lib/move_robot/7-30.py -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot
+byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/7-24.py to 7-24.cpython-310.pyc
+byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/test.py to test.cpython-310.pyc
+byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/move_command.py to move_command.cpython-310.pyc
+byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/spawn_entities.py to spawn_entities.cpython-310.pyc
+byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/move_robot_moveit2.py to move_robot_moveit2.cpython-310.pyc
+byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/move_robot.py to move_robot.cpython-310.pyc
+byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/__init__.py to __init__.cpython-310.pyc
+byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/6-25.py to 6-25.cpython-310.pyc
+byte-compiling /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot/7-30.py to 7-30.cpython-310.pyc
+running install_data
+creating /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/share/ament_index
+creating /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/share/ament_index/resource_index
+creating /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/share/ament_index/resource_index/packages
+copying resource/move_robot -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/share/ament_index/resource_index/packages
+copying package.xml -> /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/share/move_robot
+creating /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/share/move_robot/launch
+running install_egg_info
+Copying build/move_robot/move_robot.egg-info to /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/python3.10/site-packages/move_robot-0.0.0-py3.10.egg-info
+running install_scripts
+Installing move_command script to /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/move_robot
+Installing move_robot script to /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/move_robot
+Installing spawn_entities script to /home/bigchungus/ros2_iron_ws/src/move_robot/install/move_robot/lib/move_robot
+writing list of installed files to '/home/bigchungus/ros2_iron_ws/src/move_robot/build/move_robot/install.log'
