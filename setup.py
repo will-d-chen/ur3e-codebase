@@ -25,6 +25,7 @@ setup(
         'console_scripts': [
             'move_robot = move_robot.move_robot:main',
             'spawn_entities = move_robot.spawn_entities:main',
+            'move_command = move_robot.move_command:main',
         ],
     },
 )
