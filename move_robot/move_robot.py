@@ -70,14 +70,15 @@ class DynamicTrajectoryExecutor(Node):
 
         self.joint_trajectory_pub = self.create_publisher(
             JointTrajectory, 
-            '/joint_trajectory_controller/joint_trajectory', 
+            '/scaled_joint_trajectory_controller/joint_trajectory', 
             QoSProfile(depth=10)
         )
 
         self.setup_data_logging()
-        time.sleep(0.1)
+        time.sleep(0.5)
         self.setup_collision_objects()
-        time.sleep(0.1)
+        time.sleep(0.5)
+
 
         self.moveit2.max_velocity = 0.1
 
@@ -130,10 +131,13 @@ class DynamicTrajectoryExecutor(Node):
         self.moveit2.add_collision_box(
             id='floor', position=[0.0, 0.0, -0.01], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[2.0, 2.0, 0.001]
         )
+        # time.sleep(0.5)
+        # self.moveit2.add_collision_box(
+        #     id='whiteboard', position=[0.45, 0.0, 0.3], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[0.001, 0.4, 0.4]
+        # )
         time.sleep(0.5)
-        self.moveit2.add_collision_box(
-            id='whiteboard', position=[0.45, 0.0, 0.3], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[0.001, 0.4, 0.4]
-        )
+        self.get_logger().info("1done")
+        
         
 
     def interpolate_waypoint(self, start, end, alpha):
@@ -173,7 +177,7 @@ class DynamicTrajectoryExecutor(Node):
                 
                 self.joint_trajectory_pub.publish(joint_trajectory)
                 
-                # Here you can add your force control logic
+                # force control logic
                 # For example:
                 # force_feedback = self.get_force_feedback()
                 # adjusted_point = self.adjust_point_based_on_force(interpolated_point, force_feedback)
@@ -186,27 +190,47 @@ class DynamicTrajectoryExecutor(Node):
 
     def move_to_first_waypoint(self, waypoints):
         self.get_logger().info("Moving to first waypoint.")
-        waypoint_position, waypoint_orientation = waypoints[0]
 
-        position = Point(x=waypoint_position[0], y=waypoint_position[1], z=waypoint_position[2])
-        quat_xyzw = Quaternion(
-            x=waypoint_orientation[0],
-            y=waypoint_orientation[1],
-            z=waypoint_orientation[2],
-            w=waypoint_orientation[3]
+        fk_pose = self.moveit2.compute_fk()
+        time.sleep(0.5)
+        self.get_logger().info("2done")
+
+        pen_position = [
+            fk_pose.pose.position.x,
+            fk_pose.pose.position.y,
+            fk_pose.pose.position.z
+        ]
+        pen_orientation = [
+            fk_pose.pose.orientation.x,
+            fk_pose.pose.orientation.y,
+            fk_pose.pose.orientation.z,
+            fk_pose.pose.orientation.w
+        ]
+
+        self.moveit2.add_collision_box(
+            id='pen', position=pen_position, quat_xyzw=pen_orientation, size=[0.03, 0.03, 0.18]
         )
         time.sleep(0.5)
-        joint_state = self.moveit2.compute_ik(position, quat_xyzw)
+        self.moveit2.attach_collision_object(id='pen', weight=0.0)
         time.sleep(0.5)
-        if joint_state is not None:
-            joint_config = list(joint_state.position)
-            self.moveit2.move_to_configuration(joint_config)
-            self.moveit2.wait_until_executed()
-            self.get_logger().info("Reached first waypoint.")
-            return True
-        else:
-            self.get_logger().warn("Failed to compute IK for the first waypoint.")
-            return False
+
+
+        # Provided joint configuration
+        joint_config = [
+            -1.9991989999999866,  # shoulder_pan_joint
+            -1.835606000000002,   # shoulder_lift_joint
+            -2.0968710000000046,  # elbow_joint
+            -2.349238999999997,   # wrist_1_joint
+            -0.4251269999999927,  # wrist_2_joint
+            -0.0012429999999703512 # wrist_3_joint
+        ]
+
+        time.sleep(1)
+        self.moveit2.move_to_configuration(joint_config)
+        self.moveit2.wait_until_executed()
+        self.get_logger().info("Reached first waypoint.")
+        return True
+
 def main():
     rclpy.init()
 
@@ -216,7 +240,8 @@ def main():
     executor_thread.start()
     
     if executor.move_to_first_waypoint(WAYPOINTS):
-        executor.compute_and_execute_trajectory(WAYPOINTS, dt=0.1)
+        executor.compute_and_execute_trajectory(WAYPOINTS, dt=0.5)
+        #executor.get_logger().error("1Failed to move to first waypoint. Aborting execution.")
     else:
         executor.get_logger().error("Failed to move to first waypoint. Aborting execution.")
 
