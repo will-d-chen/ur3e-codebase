@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>move_robot</name>
+  <name>ur3e_control_package</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="jackdanger233@gmail.com">bigchungus</maintainer>
+  <maintainer email="will.chen@duke.edu">Will</maintainer>
   <license>TODO: License declaration</license>
 
   <test_depend>ament_copyright</test_depend>

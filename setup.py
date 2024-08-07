@@ -2,7 +2,7 @@ import os
 from glob import glob
 from setuptools import setup, find_packages
 
-package_name = 'move_robot'
+package_name = 'ur3e_control_package'
 
 setup(
     name=package_name,
@@ -23,9 +23,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'move_robot = move_robot.move_robot:main',
-            'spawn_entities = move_robot.spawn_entities:main',
-            'move_command = move_robot.move_command:main',
+            'initials_demo = ur3e_control_package.initials_demo:main',
+            'spawn_entities = ur3e_control_package.spawn_entities:main',
+            'move_command = ur3e_control_package.move_command:main',
         ],
     },
 )

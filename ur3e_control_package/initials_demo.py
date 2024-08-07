@@ -70,7 +70,7 @@ class DynamicTrajectoryExecutor(Node):
 
         self.joint_trajectory_pub = self.create_publisher(
             JointTrajectory, 
-            '/scaled_joint_trajectory_controller/joint_trajectory', 
+            '/joint_trajectory_controller/joint_trajectory', 
             QoSProfile(depth=10)
         )
 
@@ -131,12 +131,7 @@ class DynamicTrajectoryExecutor(Node):
         self.moveit2.add_collision_box(
             id='floor', position=[0.0, 0.0, -0.01], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[2.0, 2.0, 0.001]
         )
-        # time.sleep(0.5)
-        # self.moveit2.add_collision_box(
-        #     id='whiteboard', position=[0.45, 0.0, 0.3], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[0.001, 0.4, 0.4]
-        # )
         time.sleep(0.5)
-        self.get_logger().info("1done")
         
         
 
@@ -193,7 +188,6 @@ class DynamicTrajectoryExecutor(Node):
 
         fk_pose = self.moveit2.compute_fk()
         time.sleep(0.5)
-        self.get_logger().info("2done")
 
         pen_position = [
             fk_pose.pose.position.x,
