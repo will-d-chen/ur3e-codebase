@@ -1,5 +1,0 @@
-[console_scripts]
-initials_demo = ur3e_control_package.initials_demo:main
-move_command = ur3e_control_package.move_command:main
-spawn_entities = ur3e_control_package.spawn_entities:main
-
