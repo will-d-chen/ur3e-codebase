@@ -75,9 +75,9 @@ class DynamicTrajectoryExecutor(Node):
         )
 
         self.setup_data_logging()
-        time.sleep(0.5)
-        self.setup_collision_objects()
-        time.sleep(0.5)
+        # time.sleep(0.5)
+        # self.setup_collision_objects()
+        # time.sleep(0.5)
 
 
         self.moveit2.max_velocity = 0.1
@@ -132,6 +132,27 @@ class DynamicTrajectoryExecutor(Node):
             id='floor', position=[0.0, 0.0, -0.01], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[2.0, 2.0, 0.001]
         )
         time.sleep(0.5)
+        fk_pose = self.moveit2.compute_fk()
+        time.sleep(0.5)
+
+        pen_position = [
+            fk_pose.pose.position.x,
+            fk_pose.pose.position.y,
+            fk_pose.pose.position.z
+        ]
+        pen_orientation = [
+            fk_pose.pose.orientation.x,
+            fk_pose.pose.orientation.y,
+            fk_pose.pose.orientation.z,
+            fk_pose.pose.orientation.w
+        ]
+
+        self.moveit2.add_collision_box(
+            id='pen', position=pen_position, quat_xyzw=pen_orientation, size=[0.03, 0.03, 0.18]
+        )
+        time.sleep(0.5)
+        self.moveit2.attach_collision_object(id='pen', weight=0.0)
+        time.sleep(0.5)
         
         
 
@@ -179,34 +200,15 @@ class DynamicTrajectoryExecutor(Node):
                 
                 computation_time = time.time() - start_time
                 sleep_time = max(0, dt - computation_time)
-                time.sleep(sleep_time)
+                #print(computation_time)
+                time.sleep(sleep_time-0.01)
 
         self.get_logger().info("Finished executing trajectory.")
 
     def move_to_first_waypoint(self, waypoints):
         self.get_logger().info("Moving to first waypoint.")
 
-        fk_pose = self.moveit2.compute_fk()
-        time.sleep(0.5)
-
-        pen_position = [
-            fk_pose.pose.position.x,
-            fk_pose.pose.position.y,
-            fk_pose.pose.position.z
-        ]
-        pen_orientation = [
-            fk_pose.pose.orientation.x,
-            fk_pose.pose.orientation.y,
-            fk_pose.pose.orientation.z,
-            fk_pose.pose.orientation.w
-        ]
-
-        self.moveit2.add_collision_box(
-            id='pen', position=pen_position, quat_xyzw=pen_orientation, size=[0.03, 0.03, 0.18]
-        )
-        time.sleep(0.5)
-        self.moveit2.attach_collision_object(id='pen', weight=0.0)
-        time.sleep(0.5)
+        self.setup_collision_objects()
 
 
         # Provided joint configuration

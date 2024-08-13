@@ -1,223 +1,354 @@
 #!/usr/bin/env python3
 
-from threading import Thread
 import math
 import time
 import rclpy
 import csv
 import numpy as np
+import ast
 from datetime import datetime
+from threading import Thread
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
-from pymoveit2 import MoveIt2, MoveIt2State
+from pymoveit2 import MoveIt2
 from pymoveit2.robots import ur3e
-from geometry_msgs.msg import PoseStamped, Quaternion, WrenchStamped, Point
+from geometry_msgs.msg import PoseStamped, Quaternion, WrenchStamped, Point, Pose
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from rclpy.qos import QoSProfile
 from builtin_interfaces.msg import Duration
+from typing import List
 
-WAYPOINTS = [
-    # "W"
-    [[0.25, 0.14, 0.15], [0.5, 0.5, 0.5, 0.5]],
+class DynamicTrajectoryExecutor(Node):
+    def __init__(self):
+        super().__init__("dynamic_trajectory_executor")
 
-    [[0.35, 0.14, 0.25], [0.5, 0.5, 0.5, 0.5]],  # Start of W
-    [[0.35, 0.11, 0.15], [0.5, 0.5, 0.5, 0.5]],  # Mid bottom of W
-    [[0.35, 0.08, 0.25], [0.5, 0.5, 0.5, 0.5]],  # Mid top of W
-    [[0.35, 0.05, 0.15], [0.5, 0.5, 0.5, 0.5]],  # Mid bottom of W
-    [[0.35, 0.02, 0.25], [0.5, 0.5, 0.5, 0.5]],  # End of W
+        # Declare and get parameters
+        self.declare_and_get_parameters()
 
-    [[0.33, 0.02, 0.25], [0.5, 0.5, 0.5, 0.5]],
-    [[0.33, -0.1, 0.25], [0.5, 0.5, 0.5, 0.5]],
+        # Create a callback group for concurrent processing
+        callback_group = ReentrantCallbackGroup()
 
-    # Moving to start of "C"
-    [[0.35, -0.1, 0.25], [0.5, 0.5, 0.5, 0.5]],    # Start of C
-    [[0.35, -0.03, 0.25], [0.5, 0.5, 0.5, 0.5]],   # Top left of C
-    [[0.35, -0.03, 0.15], [0.5, 0.5, 0.5, 0.5]],   # Bottom left of C
-    [[0.35, -0.1, 0.15], [0.5, 0.5, 0.5, 0.5]],
-    [[0.33, -0.1, 0.15], [0.5, 0.5, 0.5, 0.5]],    # Bottom right of C
-]
+        # Initialize MoveIt2 interface for robot control
+        self.setup_moveit2(callback_group)
 
-home_position = [0.0, -math.pi / 2, 0.0, -math.pi / 2, 0.0, 0.0]
-REAL_VELOCITY = 0.02
+        # Set up publisher for joint trajectory commands
+        self.setup_joint_trajectory_publisher()
 
-def main():
-    rclpy.init()
+        # Set up data logging for joint states and force/torque readings
+        self.setup_data_logging()
 
-    node = Node("moving_the_robot")
+        # Set maximum velocity for the robot
+        self.moveit2.max_velocity = 0.1
 
-    node.declare_parameter("mode", "linear")
-    node.declare_parameter("waypoints", WAYPOINTS)
-    node.declare_parameter("speed", REAL_VELOCITY)
+    def declare_and_get_parameters(self):
+        """Declare and retrieve all necessary parameters for the node."""
+        # Declare parameters with default values
+        self.declare_parameter("waypoints", "[[[0.35, 0.14, 0.25], [0.5, 0.5, 0.5, 0.5]]]")
+        self.declare_parameter("velocity", 0.02)
+        self.declare_parameter("real_robot", False)
+        self.declare_parameter("dt", 0.2)
+        self.declare_parameter("frame", "world")
+        self.declare_parameter("initial_joint_pos", 
+                               [-1.9991989999999866,-1.835606000000002,-2.0968710000000046,
+                                -2.349238999999997,-0.4251269999999927,-0.0012429999999703512])
+        self.declare_parameter("initial_move", True)
+        self.declare_parameter("synchronous", True)
+        self.declare_parameter("cancel_after_secs", 0.0)
+        self.declare_parameter("planner_id", "RRTConfigDefault")
+        self.declare_parameter("cartesian", False)
+        self.declare_parameter("cartesian_max_step", 0.0025)
+        self.declare_parameter("cartesian_fraction_threshold", 0.0)
+        self.declare_parameter("cartesian_jump_threshold", 0.0)
+        self.declare_parameter("cartesian_avoid_collisions", False)
 
-    mode = node.get_parameter("mode").get_parameter_value().string_value
-    waypoints = node.get_parameter("waypoints").get_parameter_value().double_array_value
-    speed = node.get_parameter("speed").get_parameter_value().double_value
+        # Get parameter values
+        waypoints_str = self.get_parameter("waypoints").value
+        self.waypoints = ast.literal_eval(waypoints_str)
+        self.velocity = self.get_parameter("velocity").value
+        self.real_robot = self.get_parameter("real_robot").value
+        self.dt = self.get_parameter("dt").value
+        self.frame = self.get_parameter("frame").value
+        self.initial_joint_pos = self.get_parameter("initial_joint_pos").value
+        self.initial_move = self.get_parameter("initial_move").value
 
-    callback_group = ReentrantCallbackGroup()
+    def setup_moveit2(self, callback_group):
+        """Initialize MoveIt2 interface for robot control."""
+        self.moveit2 = MoveIt2(
+            node=self,
+            joint_names=ur3e.joint_names(),
+            base_link_name=ur3e.base_link_name(),
+            end_effector_name=ur3e.end_effector_name(),
+            group_name=ur3e.MOVE_GROUP_ARM,
+            callback_group=callback_group,
+        )
+        self.moveit2.planner_id = self.get_parameter("planner_id").get_parameter_value().string_value
 
-    moveit2 = MoveIt2(
-        node=node,
-        joint_names=ur3e.joint_names(),
-        base_link_name=ur3e.base_link_name(),
-        end_effector_name=ur3e.end_effector_name(),
-        group_name=ur3e.MOVE_GROUP_ARM,
-        callback_group=callback_group,
-    )
+    def setup_joint_trajectory_publisher(self):
+        """Set up publisher for sending joint trajectory commands to the robot."""
+        topic = '/scaled_joint_trajectory_controller/joint_trajectory' if self.real_robot else '/joint_trajectory_controller/joint_trajectory'
+        self.joint_trajectory_pub = self.create_publisher(JointTrajectory, topic, QoSProfile(depth=10))
 
-    executor = rclpy.executors.MultiThreadedExecutor(2)
-    executor.add_node(node)
-    executor_thread = Thread(target=executor.spin, daemon=True)
-    executor_thread.start()
-    node.create_rate(1.0).sleep()
+    def setup_data_logging(self):
+        """Set up CSV logging for joint states and force/torque data."""
+        # Create CSV file with timestamp in filename
+        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.csv_filename = f"joint_states_{current_time}.csv"
+        self.csv_file = open(self.csv_filename, 'w', newline='')
+        self.csv_writer = csv.writer(self.csv_file)
 
-    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_filename = f"joint_states_{current_time}.csv"
-    csv_file = open(csv_filename, 'w', newline='')
-    csv_writer = csv.writer(csv_file)
-    header = ["time"] + [f"{joint}_{attr}" for joint in ur3e.joint_names() for attr in ["position", "velocity", "effort"]]
-    header += ["force_x", "force_y", "force_z", "torque_x", "torque_y", "torque_z"]
-    csv_writer.writerow(header)
+        # Write CSV header
+        header = ["time"] + [f"{joint}_{attr}" for joint in ur3e.joint_names() for attr in ["position", "velocity", "effort"]]
+        header += ["force_x", "force_y", "force_z", "torque_x", "torque_y", "torque_z"]
+        self.csv_writer.writerow(header)
 
-    joint_data = {name: {"position": None, "velocity": None, "effort": None} for name in ur3e.joint_names()}
-    force_torque_data = {"force": {"x": None, "y": None, "z": None}, "torque": {"x": None, "y": None, "z": None}}
+        # Initialize data storage
+        self.joint_data = {name: {"position": None, "velocity": None, "effort": None} for name in ur3e.joint_names()}
+        self.force_torque_data = {"force": {"x": None, "y": None, "z": None}, "torque": {"x": None, "y": None, "z": None}}
 
-    def joint_state_callback(msg):
+        # Set up subscribers for joint states and force/torque data
+        self.create_subscription(JointState, 'joint_states', self.joint_state_callback, QoSProfile(depth=10))
+        self.create_subscription(WrenchStamped, 'force_torque_sensor_broadcaster/wrench', self.wrench_callback, QoSProfile(depth=10))
+
+    def joint_state_callback(self, msg):
+        """Callback function to process and log joint state data."""
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         row = [current_time]
 
+        # Update joint data
         for i, name in enumerate(msg.name):
-            if name in joint_data:
-                joint_data[name]["position"] = msg.position[i] if i < len(msg.position) else None
-                joint_data[name]["velocity"] = msg.velocity[i] if i < len(msg.velocity) else None
-                joint_data[name]["effort"] = msg.effort[i] if i < len(msg.effort) else None
+            if name in self.joint_data:
+                self.joint_data[name]["position"] = msg.position[i] if i < len(msg.position) else None
+                self.joint_data[name]["velocity"] = msg.velocity[i] if i < len(msg.velocity) else None
+                self.joint_data[name]["effort"] = msg.effort[i] if i < len(msg.effort) else None
 
+        # Prepare row for CSV
         for joint in ur3e.joint_names():
-            data = joint_data[joint]
+            data = self.joint_data[joint]
             row.extend([data["position"], data["velocity"], data["effort"]])
 
+        # Add force/torque data
         row.extend([
-            force_torque_data["force"]["x"], force_torque_data["force"]["y"], force_torque_data["force"]["z"],
-            force_torque_data["torque"]["x"], force_torque_data["torque"]["y"], force_torque_data["torque"]["z"]
+            self.force_torque_data["force"]["x"], self.force_torque_data["force"]["y"], self.force_torque_data["force"]["z"],
+            self.force_torque_data["torque"]["x"], self.force_torque_data["torque"]["y"], self.force_torque_data["torque"]["z"]
         ])
 
-        csv_writer.writerow(row)
+        # Write to CSV
+        self.csv_writer.writerow(row)
 
-    def wrench_callback(msg):
-        force_torque_data["force"]["x"] = msg.wrench.force.x
-        force_torque_data["force"]["y"] = msg.wrench.force.y
-        force_torque_data["force"]["z"] = msg.wrench.force.z
-        force_torque_data["torque"]["x"] = msg.wrench.torque.x
-        force_torque_data["torque"]["y"] = msg.wrench.torque.y
-        force_torque_data["torque"]["z"] = msg.wrench.torque.z
+    def wrench_callback(self, msg):
+        """Callback function to process force/torque sensor data."""
+        self.force_torque_data["force"]["x"] = msg.wrench.force.x
+        self.force_torque_data["force"]["y"] = msg.wrench.force.y
+        self.force_torque_data["force"]["z"] = msg.wrench.force.z
+        self.force_torque_data["torque"]["x"] = msg.wrench.torque.x
+        self.force_torque_data["torque"]["y"] = msg.wrench.torque.y
+        self.force_torque_data["torque"]["z"] = msg.wrench.torque.z
 
-    joint_state_sub = node.create_subscription(JointState, 'joint_states', joint_state_callback, QoSProfile(depth=10))
-    wrench_sub = node.create_subscription(WrenchStamped, 'force_torque_sensor_broadcaster/wrench', wrench_callback, QoSProfile(depth=10))
+    def setup_collision_objects(self):
+        """Set up collision objects in the planning scene."""
+        # Add floor as a collision object
+        self.moveit2.add_collision_box(
+            id='floor', position=[0.0, 0.0, -0.01], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[2.0, 2.0, 0.001]
+        )
+        time.sleep(0.1)
 
-    moveit2.add_collision_box(
-        id='floor', position=[0.0, 0.0, -0.01], quat_xyzw=[0.0, 0.0, 0.0, 1.0], size=[2.0, 2.0, 0.001]
-    )
-    time.sleep(0.5)
+        # Get current end-effector pose
+        fk_pose = self.moveit2.compute_fk()
+        time.sleep(0.1)
 
-    moveit2.max_velocity = speed*5
+        # Extract position and orientation
+        pen_position = [
+            fk_pose.pose.position.x,
+            fk_pose.pose.position.y,
+            fk_pose.pose.position.z
+        ]
+        pen_orientation = [
+            fk_pose.pose.orientation.x,
+            fk_pose.pose.orientation.y,
+            fk_pose.pose.orientation.z,
+            fk_pose.pose.orientation.w
+        ]
 
-    joint_trajectory_pub = node.create_publisher(JointTrajectory, '/joint_trajectory_controller/joint_trajectory', QoSProfile(depth=10))
+        # Add pen as a collision object
+        self.moveit2.add_collision_box(
+            id='pen', position=pen_position, quat_xyzw=pen_orientation, size=[0.03, 0.03, 0.18]
+        )
+        time.sleep(0.1)
 
-    def interpolate_waypoints(waypoints, increment):
-        interpolated_points = []
+        # Attach the pen to the robot
+        self.moveit2.attach_collision_object(id='pen', weight=0.0)
+        time.sleep(0.1)
+
+    def interpolate_waypoint(self, start, end, alpha):
+        """Interpolate between start and end poses based on alpha (0 to 1)."""
+        position = [(1 - alpha) * start[0][j] + alpha * end[0][j] for j in range(3)]
+        orientation = [(1 - alpha) * start[1][j] + alpha * end[1][j] for j in range(4)]
+        return [position, orientation]
+
+    def compute_and_execute_trajectory(self, waypoints, dt):
+        """Compute and execute a trajectory through the given waypoints."""
+        self.get_logger().info(f"Computing and executing trajectory with dt={dt}.")
+        
+        # Add the current pose as the first waypoint
+        waypoints = list(waypoints)
+        time.sleep(1)
+        current_pose = self.moveit2.compute_fk()
+        
+        if current_pose is not None:
+            # Convert Pose to list format [position, orientation]
+            position = [current_pose.pose.position.x, current_pose.pose.position.y, current_pose.pose.position.z]
+            orientation = [current_pose.pose.orientation.x, current_pose.pose.orientation.y, current_pose.pose.orientation.z, current_pose.pose.orientation.w]
+            waypoints.insert(0, [position, orientation])
+        else:
+            self.get_logger().error("Failed to compute FK for current joint states.")
+
+        # Iterate through waypoints
         for i in range(len(waypoints) - 1):
             start = waypoints[i]
             end = waypoints[i + 1]
             distance = np.linalg.norm(np.array(end[0]) - np.array(start[0]))
-            num_interpolations = int(distance / increment)
+            num_interpolations = int(distance / (self.velocity * dt))
+            
             for t in range(num_interpolations):
+                start_time = time.time()
+                
                 alpha = t / num_interpolations
-                position = [(1 - alpha) * start[0][j] + alpha * end[0][j] for j in range(3)]
-                orientation = [(1 - alpha) * start[1][j] + alpha * end[1][j] for j in range(4)]
-                interpolated_points.append([position, orientation])
-        interpolated_points.append(waypoints[-1])
-        return interpolated_points
+                interpolated_point = self.interpolate_waypoint(start, end, alpha)
+                
+                # Compute inverse kinematics for the interpolated point
+                joint_positions = self.moveit2.compute_ik(interpolated_point[0], interpolated_point[1])
+                
+                if joint_positions is None:
+                    self.get_logger().error(f"IK failed for interpolated point")
+                    continue
+                
+                # Create and publish joint trajectory
+                joint_trajectory = JointTrajectory()
+                joint_trajectory.joint_names = ur3e.joint_names()
+                
+                point = JointTrajectoryPoint()
+                point.positions = joint_positions.position
+                point.time_from_start = Duration(sec=0, nanosec=int(dt * 1e9))
+                
+                joint_trajectory.points.append(point)
+                
+                self.joint_trajectory_pub.publish(joint_trajectory)
+                
+                # Wait for the next cycle
+                computation_time = time.time() - start_time
+                sleep_time = max(0, dt - computation_time)
+                time.sleep(sleep_time)
 
-    def compute_trajectory(waypoints_input, dt):
-        node.get_logger().info(f"Computing trajectory with dt={dt}.")
-        interpolated_waypoints = interpolate_waypoints(waypoints_input, dt)
-        fk_pose = moveit2.compute_fk()
-        current_position = [fk_pose.pose.position.x, fk_pose.pose.position.y, fk_pose.pose.position.z]
+        self.get_logger().info("Finished executing trajectory.")
 
-        joint_trajectory = JointTrajectory()
-        joint_trajectory.joint_names = ur3e.joint_names()
+    def move_to_first_waypoint(self, joint_configuration):
+        """Move the robot to the initial joint configuration."""
+        self.get_logger().info("Moving to first waypoint.")
 
-        cumulative_time = 0.0
+        self.setup_collision_objects()
 
-        for idx, waypoint in enumerate(interpolated_waypoints):
-            waypoint_position, waypoint_orientation = waypoint
-            joint_positions = moveit2.compute_ik(waypoint_position, waypoint_orientation)
+        # Move to the provided joint configuration
+        self.moveit2.move_to_configuration(joint_configuration)
+        self.moveit2.wait_until_executed()
+        self.get_logger().info("Reached first waypoint.")
+        return True
 
-            if joint_positions is None:
-                node.get_logger().error(f"IK failed for waypoint {idx + 1}")
-                continue
+    def quaternion_multiply(self, q1, q2):
+        """Multiply two quaternions."""
+        x1, y1, z1, w1 = q1
+        x2, y2, z2, w2 = q2
+        return [
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
+        ]
 
-            point = JointTrajectoryPoint()
-            point.positions = joint_positions.position
+    def quaternion_to_rotation_matrix(self, q):
+        """Convert a quaternion to a rotation matrix."""
+        x, y, z, w = q
+        return np.array([
+            [1 - 2*y*y - 2*z*z, 2*x*y - 2*z*w, 2*x*z + 2*y*w],
+            [2*x*y + 2*z*w, 1 - 2*x*x - 2*z*z, 2*y*z - 2*x*w],
+            [2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x*x - 2*y*y]
+        ])
 
-            if idx == 0:
-                distance = np.linalg.norm(np.array(current_position) - np.array(waypoint_position))
-            else:
-                distance = np.linalg.norm(np.array(waypoint_position) - np.array(interpolated_waypoints[idx-1][0]))
-
-            duration_sec = distance / speed
-            cumulative_time += duration_sec
-            point.time_from_start = Duration(sec=int(cumulative_time), nanosec=int((cumulative_time % 1) * 1e9))
-
-            joint_trajectory.points.append(point)
-            time.sleep(0.1)
-
-        node.get_logger().info("Finished computing trajectory.")
-        return joint_trajectory
-
-    def execute_trajectory(joint_trajectory):
-        node.get_logger().info("Executing pre-computed trajectory.")
-        joint_trajectory_pub.publish(joint_trajectory)
+    def end_effector_frame_tf(self, waypoints: List[List[List[float]]]) -> List[Pose]:
+        """
+        Transform waypoints from the end effector frame to the world frame.
         
-        # Wait for the trajectory to complete
-        total_duration = joint_trajectory.points[-1].time_from_start.sec + joint_trajectory.points[-1].time_from_start.nanosec * 1e-9
-        time.sleep(total_duration)
-        
-        node.get_logger().info("Finished executing trajectory.")
+        :param waypoints: List of waypoints, where each waypoint is a list containing
+                        [position, orientation] lists.
+        :return: List of poses transformed to the world frame.
+        """
+        # Compute the forward kinematics to get the end effector pose in the world frame
+        time.sleep(1)
+        end_effector_pose = self.moveit2.compute_fk()
+
+        # Extract translation and rotation from the end effector pose
+        ee_translation = np.array([
+            end_effector_pose.pose.position.x,
+            end_effector_pose.pose.position.y,
+            end_effector_pose.pose.position.z
+        ])
+
+        ee_orientation = np.array([
+            end_effector_pose.pose.orientation.x,
+            end_effector_pose.pose.orientation.y,
+            end_effector_pose.pose.orientation.z,
+            end_effector_pose.pose.orientation.w
+        ])
+
+        # Create a homogeneous transformation matrix for the end effector
+        ee_rotation_matrix = self.quaternion_to_rotation_matrix(ee_orientation)
+        ee_transformation_matrix = np.eye(4)
+        ee_transformation_matrix[:3, :3] = ee_rotation_matrix
+        ee_transformation_matrix[:3, 3] = ee_translation
+
+        transformed_waypoints = []
+        for waypoint in waypoints:
+            position, orientation = waypoint
+            
+            # Convert the waypoint position to a numpy array
+            waypoint_position = np.array([position[0], position[1], position[2], 1])
+
+            # Apply the transformation
+            world_position = np.dot(ee_transformation_matrix, waypoint_position)[:3]
+
+            # Rotate the orientation
+            waypoint_orientation = np.array(orientation)
+            world_orientation = self.quaternion_multiply(ee_orientation, waypoint_orientation)
+
+            # Create the transformed Pose
+            transformed_pose = [world_position, world_orientation]
+            #transformed_pose.position.x, transformed_pose.position.y, transformed_pose.position.z = world_position
+            #transformed_pose.orientation.x, transformed_pose.orientation.y, transformed_pose.orientation.z, transformed_pose.orientation.w = world_orientation
+
+            transformed_waypoints.append(transformed_pose)
+
+        return transformed_waypoints
+       
+
+def main():
+    rclpy.init()
+
+    executor = DynamicTrajectoryExecutor()
     
-    def move_to_waypoint(waypoints_input):
-        node.get_logger().info("Moving to waypoint.")
-        waypoint_position, waypoint_orientation = waypoints_input
+    executor_thread = Thread(target=rclpy.spin, args=(executor,), daemon=True)
+    executor_thread.start()
 
-        position = Point(x=waypoint_position[0], y=waypoint_position[1], z=waypoint_position[2])
-        quat_xyzw = Quaternion(
-            x=waypoint_orientation[0],
-            y=waypoint_orientation[1],
-            z=waypoint_orientation[2],
-            w=waypoint_orientation[3]
-        )
-
-        # Compute the joint configuration for the given pose
-        joint_state = moveit2.compute_ik(position, quat_xyzw)
-        if joint_state is not None:
-            joint_config = list(joint_state.position)
-            moveit2.move_to_configuration(joint_config)
-            moveit2.wait_until_executed()
-            node.get_logger().info("Reached waypoint.")
-        else:
-            node.get_logger().warn("Failed to compute IK for the first waypoint.")
-
-
-    # Choose the operation mode based on the input parameter
-    if mode == "linear":
-        trajectory = compute_trajectory(waypoints, dt=0.01)
-        execute_trajectory(trajectory)
+    if executor.initial_move:
+        executor.move_to_first_waypoint(executor.initial_joint_pos)
     else:
-        move_to_waypoint(waypoints)
+        if executor.frame == "world":
+            executor.compute_and_execute_trajectory(executor.waypoints, dt=executor.dt)
+        else:
+            executor.compute_and_execute_trajectory(executor.end_effector_frame_tf(executor.waypoints), dt=executor.dt)
 
     rclpy.shutdown()
     executor_thread.join()
-    csv_file.close()
+    executor.csv_file.close()
     exit(0)
 
 if __name__ == "__main__":
