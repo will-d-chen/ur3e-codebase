@@ -38,7 +38,7 @@ class DynamicTrajectoryExecutor(Node):
         # Set up data logging for joint states and force/torque readings
         self.setup_data_logging()
 
-        # Set maximum velocity for the robot
+        # Set maximum velocity for the robot in moveit2
         self.moveit2.max_velocity = 0.1
 
     def declare_and_get_parameters(self):
@@ -71,6 +71,15 @@ class DynamicTrajectoryExecutor(Node):
         self.frame = self.get_parameter("frame").value
         self.initial_joint_pos = self.get_parameter("initial_joint_pos").value
         self.initial_move = self.get_parameter("initial_move").value
+
+        '''  PID values for untested force control implementation      
+        self.Kp = 0.001  # Proportional gain
+        self.Ki = 0.0001  # Integral gain
+        self.Kd = 0.00001  # Derivative gain
+        self.integral = np.zeros(3)
+        self.previous_error = np.zeros(3)
+        self.desired_force = np.array([0, 0, -5])  
+        '''
 
     def setup_moveit2(self, callback_group):
         """Initialize MoveIt2 interface for robot control."""
@@ -215,6 +224,12 @@ class DynamicTrajectoryExecutor(Node):
                 
                 alpha = t / num_interpolations
                 interpolated_point = self.interpolate_waypoint(start, end, alpha)
+
+                # force control logic
+                # For example:
+                # force_feedback = self.get_force_torque()
+                # adjusted_point = self.force_pid(interpolated_point, force_feedback, direction_quat)
+                # joint_positions = self.moveit2.compute_ik(interpolated_point[0], interpolated_point[0]-adjusted_point)
                 
                 # Compute inverse kinematics for the interpolated point
                 joint_positions = self.moveit2.compute_ik(interpolated_point[0], interpolated_point[1])
@@ -322,13 +337,78 @@ class DynamicTrajectoryExecutor(Node):
 
             # Create the transformed Pose
             transformed_pose = [world_position, world_orientation]
-            #transformed_pose.position.x, transformed_pose.position.y, transformed_pose.position.z = world_position
-            #transformed_pose.orientation.x, transformed_pose.orientation.y, transformed_pose.orientation.z, transformed_pose.orientation.w = world_orientation
 
             transformed_waypoints.append(transformed_pose)
 
         return transformed_waypoints
-       
+
+    def get_joint_states(self):
+        """
+        Get the current joint states.
+        
+        :return: A dictionary containing position, velocity, and effort for each joint.
+        """
+        return {
+            joint: {
+                "position": self.joint_data[joint]["position"],
+                "velocity": self.joint_data[joint]["velocity"],
+                "effort": self.joint_data[joint]["effort"]
+            }
+            for joint in ur3e.joint_names()
+        }
+
+    def get_force_torque(self):
+        """
+        Get the current force and torque readings.
+        
+        :return: A dictionary containing force and torque data.
+        """
+        return {
+            "force": {
+                "x": self.force_torque_data["force"]["x"],
+                "y": self.force_torque_data["force"]["y"],
+                "z": self.force_torque_data["force"]["z"]
+            },
+            "torque": {
+                "x": self.force_torque_data["torque"]["x"],
+                "y": self.force_torque_data["torque"]["y"],
+                "z": self.force_torque_data["torque"]["z"]
+            }
+        }
+''' EXPERIMENTAL, NOT TESTED
+    def force_pid(self, interpolated_point, force_feedback, direction_quat):
+        """
+        Adjust the interpolated point based on force feedback using a PID controller.
+        
+        :param interpolated_point: Current interpolated point [position, orientation]
+        :param force_feedback: Force feedback from get_force_torque()
+        :param direction_quat: Quaternion representing the direction of motion
+        :return: Adjusted point
+        """
+        # Extract current force
+        current_force = np.array([
+            force_feedback['force']['x'],
+            force_feedback['force']['y'],
+            force_feedback['force']['z']
+        ])
+
+        error = self.desired_force - current_force
+
+        self.integral += error
+
+        derivative = error - self.previous_error
+
+        adjustment = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+
+        rotation_matrix = self.quaternion_to_rotation_matrix(direction_quat)
+        world_adjustment = rotation_matrix.dot(adjustment)
+
+        adjusted_point = np.array(interpolated_point[0]) + world_adjustment
+
+        self.previous_error = error
+
+        return adjusted_point.tolist()
+'''
 
 def main():
     rclpy.init()

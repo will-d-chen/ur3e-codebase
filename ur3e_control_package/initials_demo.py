@@ -75,10 +75,6 @@ class DynamicTrajectoryExecutor(Node):
         )
 
         self.setup_data_logging()
-        # time.sleep(0.5)
-        # self.setup_collision_objects()
-        # time.sleep(0.5)
-
 
         self.moveit2.max_velocity = 0.1
 
