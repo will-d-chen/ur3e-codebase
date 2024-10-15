@@ -3,36 +3,65 @@
 import rclpy
 from threading import Thread
 from ur3e_control_package.move_command import DynamicTrajectoryExecutor
+import time
 
 WAYPOINTS = [
     # "W"
-    [[0.3, 0.14, 0.15], [0.5, 0.5, 0.5, 0.5]],
+    [[-0.05, 0.35, 0.05], [1, 0, 0, 0]]
 
-    [[0.35, 0.14, 0.25], [0.5, 0.5, 0.5, 0.5]],  # Start of W
-    [[0.35, 0.11, 0.15], [0.5, 0.5, 0.5, 0.5]],  # Mid bottom of W
-    [[0.35, 0.08, 0.25], [0.5, 0.5, 0.5, 0.5]],  # Mid top of W
-    [[0.35, 0.05, 0.15], [0.5, 0.5, 0.5, 0.5]],  # Mid bottom of W
-    [[0.35, 0.02, 0.25], [0.5, 0.5, 0.5, 0.5]],  # End of W
-
-    [[0.33, 0.02, 0.25], [0.5, 0.5, 0.5, 0.5]],
-    [[0.33, -0.1, 0.25], [0.5, 0.5, 0.5, 0.5]],
-
-    # Moving to start of "C"
-    [[0.35, -0.1, 0.25], [0.5, 0.5, 0.5, 0.5]],    # Start of C
-    [[0.35, -0.03, 0.25], [0.5, 0.5, 0.5, 0.5]],   # Top left of C
-    [[0.35, -0.03, 0.15], [0.5, 0.5, 0.5, 0.5]],   # Bottom left of C
-    [[0.35, -0.1, 0.15], [0.5, 0.5, 0.5, 0.5]],
-    [[0.33, -0.1, 0.15], [0.5, 0.5, 0.5, 0.5]],    # Bottom right of C
 ]
 
 joint_config = [
-            -1.9991989999999866,  # shoulder_pan_joint
-            -1.835606000000002,   # shoulder_lift_joint
-            -2.0968710000000046,  # elbow_joint
-            -2.349238999999997,   # wrist_1_joint
-            -0.4251269999999927,  # wrist_2_joint
-            -0.0012429999999703512 # wrist_3_joint
-        ]
+    -1.6006999999999998,  # shoulder_pan_joint
+    -1.7271,              # shoulder_lift_joint
+    -2.2029999999999994,  # elbow_joint
+    -0.8079999999999998,  # wrist_1_joint
+    1.5951,               # wrist_2_joint
+    -0.030999999999999694 # wrist_3_joint
+]
+
+
+
+def generate_square_sweep_waypoints(width, height, z_height, discretize_step):
+    """
+    Generate waypoints for a square sweep pattern.
+    
+    :param width: Width of the square in meters
+    :param height: Height of the square in meters
+    :param z_height: Height of the sweep plane in meters
+    :param discretize_step: Step size for discretization in millimeters
+    :return: List of waypoints in the specified format
+    """
+    waypoints = []
+    identity_quat = [0, 0, 0, 1]
+    step = discretize_step / 1000  # Convert mm to meters
+
+    # Calculate number of steps in each direction
+    num_steps_x = int(width / step) + 1
+    num_steps_y = int(height / step) + 1
+
+    for i in range(num_steps_x):
+        x = i * step
+        if i % 2 == 0:  # Even rows: bottom to top
+            y_range = range(num_steps_y)
+        else:  # Odd rows: top to bottom
+            y_range = range(num_steps_y - 1, -1, -1)
+        
+        for j in y_range:
+            y = j * step
+            
+            # Add point at z_height
+            waypoints.append([[x, y, z_height], identity_quat])
+            
+            # Add point at z=0
+            waypoints.append([[x, y, 0], identity_quat])
+            
+            # Add point back at z_height
+            waypoints.append([[x, y, z_height], identity_quat])
+
+    return waypoints
+
+WAYPOINTS1 = generate_square_sweep_waypoints(width=0.1, height=0.1, z_height=-0.02, discretize_step=50)
 
 def main():
     # Initialize rclpy
@@ -45,9 +74,15 @@ def main():
     executor_thread = Thread(target=rclpy.spin, args=(executor,), daemon=True)
     executor_thread.start()
     
+    
     # execute the movements
     executor.move_to_first_waypoint(joint_config)
     executor.compute_and_execute_trajectory(WAYPOINTS, dt=0.2)
+    print(WAYPOINTS1)
+    #time.sleep(1)
+    #print(executor.get_joint_states())
+
+    executor.compute_and_execute_trajectory(executor.end_effector_frame_tf(WAYPOINTS1), dt=0.2)
 
     # Shutdown and cleanup
     rclpy.shutdown()

@@ -18,6 +18,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from rclpy.qos import QoSProfile
 from builtin_interfaces.msg import Duration
 from typing import List
+from ur_ikfast import ur_kinematics
 
 class DynamicTrajectoryExecutor(Node):
     def __init__(self):
@@ -71,6 +72,7 @@ class DynamicTrajectoryExecutor(Node):
         self.frame = self.get_parameter("frame").value
         self.initial_joint_pos = self.get_parameter("initial_joint_pos").value
         self.initial_move = self.get_parameter("initial_move").value
+        self.ur3e_arm = ur_kinematics.URKinematics('ur3e')
 
         '''  PID values for untested force control implementation      
         self.Kp = 0.001  # Proportional gain
@@ -180,14 +182,15 @@ class DynamicTrajectoryExecutor(Node):
         ]
 
         # Add pen as a collision object
-        self.moveit2.add_collision_box(
-            id='pen', position=pen_position, quat_xyzw=pen_orientation, size=[0.03, 0.03, 0.18]
-        )
+        #self.moveit2.add_collision_box(
+        #    id='pen', position=pen_position, quat_xyzw=pen_orientation, size=[0.03, 0.03, 0.18]
+        #)
         time.sleep(0.1)
 
         # Attach the pen to the robot
-        self.moveit2.attach_collision_object(id='pen', weight=0.0)
+        #self.moveit2.attach_collision_object(id='pen', weight=0.0)
         time.sleep(0.1)
+        return pen_position, pen_orientation
 
     def interpolate_waypoint(self, start, end, alpha):
         """Interpolate between start and end poses based on alpha (0 to 1)."""
@@ -205,12 +208,15 @@ class DynamicTrajectoryExecutor(Node):
         current_pose = self.moveit2.compute_fk()
         
         if current_pose is not None:
-            # Convert Pose to list format [position, orientation]
             position = [current_pose.pose.position.x, current_pose.pose.position.y, current_pose.pose.position.z]
             orientation = [current_pose.pose.orientation.x, current_pose.pose.orientation.y, current_pose.pose.orientation.z, current_pose.pose.orientation.w]
             waypoints.insert(0, [position, orientation])
         else:
             self.get_logger().error("Failed to compute FK for current joint states.")
+
+        # Get current joint positions for initial guess
+        current_joint_states = self.get_joint_states()
+        current_joints = [current_joint_states[joint]["position"] for joint in ur3e.joint_names()]
 
         # Iterate through waypoints
         for i in range(len(waypoints) - 1):
@@ -225,17 +231,16 @@ class DynamicTrajectoryExecutor(Node):
                 alpha = t / num_interpolations
                 interpolated_point = self.interpolate_waypoint(start, end, alpha)
 
-                # force control logic
-                # For example:
-                # force_feedback = self.get_force_torque()
-                # adjusted_point = self.force_pid(interpolated_point, force_feedback, direction_quat)
-                # joint_positions = self.moveit2.compute_ik(interpolated_point[0], interpolated_point[0]-adjusted_point)
-                
-                # Compute inverse kinematics for the interpolated point
-                joint_positions = self.moveit2.compute_ik(interpolated_point[0], interpolated_point[1])
+                # Compute inverse kinematics using URKinematics
+                pose_quat = interpolated_point[0] + interpolated_point[1]  # Combine position and orientation
+                joint_positions = self.ur3e_arm.inverse(pose_quat, False, q_guess=current_joints)
                 
                 if joint_positions is None:
-                    self.get_logger().error(f"IK failed for interpolated point")
+                    self.get_logger().warn("URKinematics IK failed. Falling back to MoveIt.")
+                    joint_positions = self.moveit2.compute_ik(interpolated_point[0], interpolated_point[1])
+                
+                if joint_positions is None:
+                    self.get_logger().error(f"Both URKinematics and MoveIt IK failed for interpolated point")
                     continue
                 
                 # Create and publish joint trajectory
@@ -243,16 +248,26 @@ class DynamicTrajectoryExecutor(Node):
                 joint_trajectory.joint_names = ur3e.joint_names()
                 
                 point = JointTrajectoryPoint()
-                point.positions = joint_positions.position
+                # Handle different types of joint_positions (numpy array, list, or object with position attribute)
+                if isinstance(joint_positions, np.ndarray):
+                    point.positions = joint_positions.tolist()
+                elif isinstance(joint_positions, list):
+                    point.positions = joint_positions
+                else:
+                    point.positions = joint_positions.position
                 point.time_from_start = Duration(sec=0, nanosec=int(dt * 1e9))
                 
                 joint_trajectory.points.append(point)
                 
                 self.joint_trajectory_pub.publish(joint_trajectory)
                 
+                # Update current_joints for next iteration
+                current_joints = point.positions
+                
                 # Wait for the next cycle
                 computation_time = time.time() - start_time
                 sleep_time = max(0, dt - computation_time)
+                print(computation_time)
                 time.sleep(sleep_time)
 
         self.get_logger().info("Finished executing trajectory.")
@@ -260,8 +275,9 @@ class DynamicTrajectoryExecutor(Node):
     def move_to_first_waypoint(self, joint_configuration):
         """Move the robot to the initial joint configuration."""
         self.get_logger().info("Moving to first waypoint.")
+        time.sleep(1)
 
-        self.setup_collision_objects()
+        #self.setup_collision_objects()
 
         # Move to the provided joint configuration
         self.moveit2.move_to_configuration(joint_configuration)

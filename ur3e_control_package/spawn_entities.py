@@ -1,105 +1,91 @@
 import rclpy
 from rclpy.node import Node
-from gazebo_msgs.srv import SpawnEntity, DeleteEntity
-from geometry_msgs.msg import Pose, Quaternion
-from moveit_msgs.msg import AttachedCollisionObject, CollisionObject
-from shape_msgs.msg import SolidPrimitive
-from std_msgs.msg import Header
+from gazebo_msgs.srv import SpawnEntity
+from geometry_msgs.msg import Pose
+
 
 class SpawnEntities(Node):
-
     def __init__(self):
         super().__init__('spawn_entities')
-        self.spawn_client = self.create_client(SpawnEntity, '/spawn_entity')
-        self.delete_client = self.create_client(DeleteEntity, '/delete_entity')
-        self.attach_publisher = self.create_publisher(AttachedCollisionObject, '/attached_collision_object', 10)
-        self.clean_start()
-        #self.spawn_marker()
-        self.spawn_whiteboard()
-        #self.attach_marker()
+        self.client = self.create_client(SpawnEntity, '/spawn_entity')
+        while not self.client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('service not available, waiting again...')
+        self.req = SpawnEntity.Request()
 
-    def clean_start(self):
-        self.delete_entity('marker')
-        self.delete_entity('whiteboard')
+    def spawn_box(self):
+        # Box size
+        box_size = "0.1 0.1 0.05"  # width, length, height
 
-    def delete_entity(self, name):
-        request = DeleteEntity.Request()
-        request.name = name
+        # Box pose
+        box_pose = Pose()
+        box_pose.position.x = 0.0
+        box_pose.position.y = 0.3
+        box_pose.position.z = 0.0
+        q = [1.0, 0.0, 0.0 ,0.0]
+        box_pose.orientation.x = q[0]
+        box_pose.orientation.y = q[1]
+        box_pose.orientation.z = q[2]
+        box_pose.orientation.w = q[3]
 
-        while not self.delete_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Service /delete_entity not available, waiting again...')
+        # Box model XML
+        model_xml = f"""
+        <?xml version="1.0"?>
+        <sdf version="1.6">
+          <model name="box">
+            <pose>0 0 0 0 0 0</pose>
+            <link name="box_link">
+              <inertial>
+                <mass>1.0</mass>
+                <inertia>
+                  <ixx>0.083</ixx>
+                  <ixy>0.0</ixy>
+                  <ixz>0.0</ixz>
+                  <iyy>0.083</iyy>
+                  <iyz>0.0</iyz>
+                  <izz>0.083</izz>
+                </inertia>
+              </inertial>
+              <collision name="box_collision">
+                <geometry>
+                  <box>
+                    <size>{box_size}</size>
+                  </box>
+                </geometry>
+              </collision>
+              <visual name="box_visual">
+                <geometry>
+                  <box>
+                    <size>{box_size}</size>
+                  </box>
+                </geometry>
+                <material>
+                  <ambient>1 0 0 1</ambient>
+                  <diffuse>1 0 0 1</diffuse>
+                  <specular>0.1 0.1 0.1 1</specular>
+                  <emissive>0 0 0 0</emissive>
+                </material>
+              </visual>
+            </link>
+          </model>
+        </sdf>
+        """
 
-        self.delete_client.call_async(request)
+        self.req.name = "box"
+        self.req.xml = model_xml
+        self.req.initial_pose = box_pose
 
-    def spawn_marker(self):
-        marker_pose = Pose()
-        marker_pose.position.x = 0.0  # Spawn away from the robot initially
-        marker_pose.position.y = 0.25
-        marker_pose.position.z = 0.7
-        marker_pose.orientation = Quaternion(x=0.0, y=0.0, z=1.0, w=0.0)  # Rotate 180 degrees around Z-axis
-
-        request = SpawnEntity.Request()
-        request.name = 'marker'
-        request.xml = open('/home/bigchungus/ros2_iron_ws/src/move_robot/models/marker.sdf', 'r').read()
-        request.robot_namespace = ''
-        request.initial_pose = marker_pose
-        request.reference_frame = 'world'
-
-        while not self.spawn_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Service /spawn_entity not available, waiting again...')
-
-        self.spawn_client.call_async(request)
-
-    def spawn_whiteboard(self):
-        whiteboard_pose = Pose()
-        whiteboard_pose.position.x = 0.43
-        whiteboard_pose.position.y = 0.0
-        whiteboard_pose.position.z = 0.2
-        whiteboard_pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
-
-        request = SpawnEntity.Request()
-        request.name = 'whiteboard'
-        request.xml = open('/home/bigchungus/ros2_iron_ws/src/move_robot/models/whiteboard.sdf', 'r').read()
-        request.robot_namespace = ''
-        request.initial_pose = whiteboard_pose
-        request.reference_frame = 'world'
-
-        while not self.spawn_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Service /spawn_entity not available, waiting again...')
-
-        self.spawn_client.call_async(request)
-
-    def attach_marker(self):
-        attached_object = AttachedCollisionObject()
-        attached_object.link_name = 'wrist_3_link'
-        attached_object.object.header.frame_id = 'wrist_3_link'
-        attached_object.object.id = 'marker'
-
-        # Define the shape and dimensions of the marker
-        primitive = SolidPrimitive()
-        primitive.type = SolidPrimitive.BOX
-        primitive.dimensions = [0.001, 0.001, 0.1]  # Example dimensions, adjust as necessary
-
-        # Define the pose of the marker relative to the wrist_3_link
-        pose = Pose()
-        pose.position.x = 0.0
-        pose.position.y = 0.0
-        pose.position.z = 0.1
-        pose.orientation.w = 1.0
-
-        # Add the primitive and pose to the collision object
-        attached_object.object.primitives.append(primitive)
-        attached_object.object.primitive_poses.append(pose)
-        attached_object.object.operation = CollisionObject.ADD
-
-        # Publish the attached collision object
-        self.attach_publisher.publish(attached_object)
+        future = self.client.call_async(self.req)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is not None:
+            self.get_logger().info('Box spawned successfully')
+        else:
+            self.get_logger().error('Failed to spawn box')
 
 def main(args=None):
     rclpy.init(args=args)
-    spawn_entities = SpawnEntities()
-    rclpy.spin(spawn_entities)
-    spawn_entities.destroy_node()
+    box_spawner = SpawnEntities()
+    box_spawner.spawn_box()
+    box_spawner.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':
