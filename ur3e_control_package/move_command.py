@@ -198,8 +198,24 @@ class DynamicTrajectoryExecutor(Node):
         orientation = [(1 - alpha) * start[1][j] + alpha * end[1][j] for j in range(4)]
         return [position, orientation]
 
+    def check_joint_angle_limits(self, current_joints, new_joints, max_change_degrees=20):
+        """
+        Check if any joint angle has changed more than the specified limit.
+        
+        Args:
+            current_joints: Current joint positions in radians
+            new_joints: Proposed new joint positions in radians
+            max_change_degrees: Maximum allowed change in degrees
+        
+        Returns:
+            bool: True if changes are within limits, False otherwise
+        """
+        max_change_radians = np.deg2rad(max_change_degrees)
+        changes = np.abs(np.array(new_joints) - np.array(current_joints))
+        return np.all(changes <= max_change_radians)
+
     def compute_and_execute_trajectory(self, waypoints, dt):
-        """Compute and execute a trajectory through the given waypoints."""
+        """Compute and execute a trajectory through the given waypoints with joint angle safety checks."""
         self.get_logger().info(f"Computing and executing trajectory with dt={dt}.")
         
         # Add the current pose as the first waypoint
@@ -209,15 +225,17 @@ class DynamicTrajectoryExecutor(Node):
         
         if current_pose is not None:
             position = [current_pose.pose.position.x, current_pose.pose.position.y, current_pose.pose.position.z]
-            orientation = [current_pose.pose.orientation.x, current_pose.pose.orientation.y, current_pose.pose.orientation.z, current_pose.pose.orientation.w]
+            orientation = [current_pose.pose.orientation.x, current_pose.pose.orientation.y, 
+                        current_pose.pose.orientation.z, current_pose.pose.orientation.w]
             waypoints.insert(0, [position, orientation])
         else:
             self.get_logger().error("Failed to compute FK for current joint states.")
+            return
 
         # Get current joint positions for initial guess
         current_joint_states = self.get_joint_states()
         current_joints = [current_joint_states[joint]["position"] for joint in ur3e.joint_names()]
-
+        
         # Iterate through waypoints
         for i in range(len(waypoints) - 1):
             start = waypoints[i]
@@ -230,13 +248,26 @@ class DynamicTrajectoryExecutor(Node):
                 
                 alpha = t / num_interpolations
                 interpolated_point = self.interpolate_waypoint(start, end, alpha)
-
                 # Compute inverse kinematics using URKinematics
                 pose_quat = interpolated_point[0] + interpolated_point[1]  # Combine position and orientation
                 joint_positions = self.ur3e_arm.inverse(pose_quat, False, q_guess=current_joints)
                 
+                if joint_positions is not None:
+                    # Check if joint angle changes are within limits
+                    if not self.check_joint_angle_limits(current_joints, joint_positions):
+                        self.get_logger().warn("URKinematics solution exceeded joint angle limits. Trying again")
+                        for i in range(100):
+                            joint_positions = self.ur3e_arm.inverse(pose_quat, False, q_guess=current_joints)
+                            if self.check_joint_angle_limits(current_joints, joint_positions):
+                                break
+
+
+
+                        self.get_logger().warn("URKinematics solution exceeded joint angle limits. Trying again")
+                        joint_positions = None
+                
                 if joint_positions is None:
-                    self.get_logger().warn("URKinematics IK failed. Falling back to MoveIt.")
+                    self.get_logger().warn("Using MoveIt for IK computation.")
                     joint_positions = self.moveit2.compute_ik(interpolated_point[0], interpolated_point[1])
                 
                 if joint_positions is None:
@@ -248,7 +279,7 @@ class DynamicTrajectoryExecutor(Node):
                 joint_trajectory.joint_names = ur3e.joint_names()
                 
                 point = JointTrajectoryPoint()
-                # Handle different types of joint_positions (numpy array, list, or object with position attribute)
+                # Handle different types of joint_positions
                 if isinstance(joint_positions, np.ndarray):
                     point.positions = joint_positions.tolist()
                 elif isinstance(joint_positions, list):
@@ -269,7 +300,7 @@ class DynamicTrajectoryExecutor(Node):
                 sleep_time = max(0, dt - computation_time)
                 print(computation_time)
                 time.sleep(sleep_time)
-
+                
         self.get_logger().info("Finished executing trajectory.")
 
     def move_to_first_waypoint(self, joint_configuration):

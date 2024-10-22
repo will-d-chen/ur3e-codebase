@@ -7,7 +7,7 @@ import time
 
 WAYPOINTS = [
     # "W"
-    [[-0.05, 0.35, 0.05], [1, 0, 0, 0]]
+    [[-0.05, 0.35, 0.15], [ 0.924, 0.383, 0, 0 ]]
 
 ]
 
@@ -61,7 +61,7 @@ def generate_square_sweep_waypoints(width, height, z_height, discretize_step):
 
     return waypoints
 
-WAYPOINTS1 = generate_square_sweep_waypoints(width=0.1, height=0.1, z_height=-0.02, discretize_step=50)
+WAYPOINTS1 = generate_square_sweep_waypoints(width=0.08, height=0.08, z_height=-0.02, discretize_step=40)
 
 def main():
     # Initialize rclpy
@@ -69,6 +69,7 @@ def main():
 
     # Create an instance of your executor
     executor = DynamicTrajectoryExecutor()
+
 
     # Start the ROS 2 spin in a separate thread
     executor_thread = Thread(target=rclpy.spin, args=(executor,), daemon=True)
