@@ -204,7 +204,7 @@ class DynamicTrajectoryExecutor(Node):
         
         # Add the current pose as the first waypoint
         waypoints = list(waypoints)
-        time.sleep(1)
+        time.sleep(0.1)
         current_pose = self.moveit2.compute_fk()
         
         if current_pose is not None:
