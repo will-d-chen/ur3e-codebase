@@ -86,16 +86,29 @@ def main():
     #print(executor.get_joint_states())
     count = 0
 
+    # Initialize the previous waypoint to None for the first iteration
+    previous_waypoint = None
+
     for waypoint in WAYPOINTS1:
-        # Create a single-point trajectory
-        single_point = [waypoint]
-        count = count + 1
-        # Compute and execute for this single point
-        if count % 3 == 0:
-            time.sleep(1) #take measurement
-
-        executor.compute_and_execute_trajectory(single_point, dt=0.2)
-
+        if previous_waypoint is not None:
+            # Calculate the difference between current and previous positions
+            diff_x = waypoint[0][0] - previous_waypoint[0][0]
+            diff_y = waypoint[0][1] - previous_waypoint[0][1]
+            diff_z = waypoint[0][2] - previous_waypoint[0][2]
+            
+            # Create a single-point trajectory with the difference
+            # Keep the quaternion from the current waypoint
+            difference_point = [[diff_x, diff_y, diff_z], waypoint[1]]
+            single_point = [difference_point]
+            
+            count = count + 1
+            if count % 3 == 0:
+                time.sleep(1)  # take measurement
+                
+            executor.compute_and_execute_trajectory(single_point, dt=0.2)
+        
+        # Update previous waypoint for the next iteration
+        previous_waypoint = waypoint
 
     # Shutdown and cleanup
     rclpy.shutdown()
